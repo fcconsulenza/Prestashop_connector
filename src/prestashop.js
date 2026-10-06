@@ -7,7 +7,7 @@ const val = v => {
 };
 const arr = (o,k) => !o?.[k] ? [] : Array.isArray(o[k]) ? o[k] : [o[k]];
 
-async function psGet(storeId, resource, params={}) {
+export async function psGet(storeId, resource, params={}) {
   const s=getStore(storeId);
   const url=new URL(`${s.baseUrl}/api/${resource}`);
   url.searchParams.set("output_format","JSON");
@@ -29,7 +29,8 @@ async function psGet(storeId, resource, params={}) {
 }
 
 export function listStores(){
-  return stores.map(s=>({id:s.id,name:s.name,base_url:s.baseUrl,configured:Boolean(process.env[s.keyEnv]),mode:"read-only",management_fee_percent:s.fee}));
+  const writable=(process.env.PS_WRITE_STORES||'').split(',').map(s=>s.trim());
+  return stores.map(s=>({id:s.id,name:s.name,base_url:s.baseUrl,configured:Boolean(process.env[s.keyEnv]),mode:writable.includes(s.id)?"scoped-writes":"read-only",management_fee_percent:s.fee}));
 }
 
 export async function testStore(storeId){

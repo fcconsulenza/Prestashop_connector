@@ -28,7 +28,7 @@ test('canonical API, JSON headers, safe errors and order PII allowlist', async (
   } finally {global.fetch=original;delete process.env.PS_KEY_ADIPIETRO;}
 });
 
-test('real MCP transport: auth, handshake, six tools, object structuredContent', async () => {
+test('real MCP transport: auth, handshake, thirteen tools, object structuredContent', async () => {
   const child=spawn(process.execPath,['src/server.js'],{env:{...process.env,PORT:'31983',MCP_BEARER_TOKEN:'local-test-only'}});
   const exited=once(child,'exit');
   try {
@@ -37,7 +37,9 @@ test('real MCP transport: auth, handshake, six tools, object structuredContent',
     assert.equal(denied.status,401);
     const client=new Client({name:'verification',version:'1'});
     await client.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:31983/mcp'),{requestInit:{headers:{Authorization:'Bearer local-test-only'}}}));
-    assert.equal((await client.listTools()).tools.length,6);
+    const tools=(await client.listTools()).tools;
+    assert.equal(tools.length,13);
+    assert.equal(tools.find(t=>t.name==='prestashop_apply_preview').annotations.readOnlyHint,false);
     const result=await client.callTool({name:'prestashop_list_stores',arguments:{}});
     assert.ok(Array.isArray(result.structuredContent.items));
     assert.equal(result.structuredContent.items[0].id,'adipietro');
