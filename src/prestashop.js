@@ -13,11 +13,16 @@ async function psGet(storeId, resource, params={}) {
   url.searchParams.set("output_format","JSON");
   for (const [k,v] of Object.entries(params)) if(v!==undefined && v!==null) url.searchParams.set(k,String(v));
   const auth=Buffer.from(`${s.apiKey}:`).toString("base64");
-  const r=await fetch(url,{headers:{Authorization:`Basic ${auth}`,Accept:"application/json","User-Agent":"FC-AI-Connector/0.3"},signal:AbortSignal.timeout(15000)});
+  const r=await fetch(url,{headers:{Authorization:`Basic ${auth}`,Accept:"application/json","Output-Format":"JSON","User-Agent":"FC-AI-Connector/0.3.1"},redirect:"manual",signal:AbortSignal.timeout(15000)});
   const t=await r.text();
-  if(!r.ok) throw new Error(`PrestaShop HTTP ${r.status}: ${t.slice(0,200)}`);
-  if(!t.trim()) return {};
-  try{return JSON.parse(t)}catch{throw new Error("PrestaShop returned non-JSON data")}
+  if(r.status>=300 && r.status<400) throw new Error(`PrestaShop redirects the API (HTTP ${r.status}); configure the canonical store URL`);
+  if(!r.ok) throw new Error(`PrestaShop HTTP ${r.status} for ${resource}`);
+  if(!t.trim()) throw new Error(`PrestaShop returned an empty response for ${resource}`);
+  let data;
+  try{data=JSON.parse(t)}catch{throw new Error(`PrestaShop returned non-JSON data for ${resource} (HTTP ${r.status}; content-type ${r.headers.get("content-type")||"unknown"})`)}
+  if(data.errors) throw new Error(`PrestaShop returned API errors for ${resource}`);
+  if(!data[resource]) throw new Error(`PrestaShop response is missing ${resource}`);
+  return data;
 }
 
 export function listStores(){

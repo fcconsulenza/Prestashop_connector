@@ -1,5 +1,5 @@
 export const stores = [
-  { id: "adipietro", name: "Adipietro Commerciale", baseUrl: "https://www.adipietro.it", keyEnv: "PS_KEY_ADIPIETRO", fee: 3 },
+  { id: "adipietro", name: "Adipietro Commerciale", baseUrl: "https://adipietro.it", keyEnv: "PS_KEY_ADIPIETRO", fee: 3 },
   { id: "cartoschool", name: "Cartoschool", baseUrl: "https://www.cartoschool.it", keyEnv: "PS_KEY_CARTOSCHOOL", fee: 3 },
   { id: "le3c", name: "Le 3C Giocattoli", baseUrl: "https://www.le3cgiocattoli.com", keyEnv: "PS_KEY_LE3C", fee: 3 },
   { id: "balita", name: "Balita Store", baseUrl: "https://www.balitastore.it", keyEnv: "PS_KEY_BALITA", fee: 3 }
