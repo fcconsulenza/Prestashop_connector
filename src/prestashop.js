@@ -73,5 +73,5 @@ export async function sales({storeId,from,to}){
     offset+=size;
   }
   const revenue=matched.reduce((a,x)=>a+x.total,0);
-  return {store_id:s.id,store_name:s.name,from,to,orders:matched.length,revenue_tax_incl:+revenue.toFixed(2),average_order_value:+(matched.length?revenue/matched.length:0).toFixed(2),management_fee_percent:s.fee,management_fee_amount:+(revenue*s.fee/100).toFixed(2),scan_limit_reached:scanned>=cfg.maxOrders};
+  return {store_id:s.id,store_name:s.name,from,to,orders:matched.length,revenue_tax_incl:+revenue.toFixed(2),average_order_value:+(matched.length?revenue/matched.length:0).toFixed(2),management_fee_percent:s.fee,management_fee_amount:s.fee==null?null:+(revenue*s.fee/100).toFixed(2),scan_limit_reached:scanned>=cfg.maxOrders};
 }
