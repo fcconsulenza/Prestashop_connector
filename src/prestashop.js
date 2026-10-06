@@ -19,7 +19,10 @@ async function psGet(storeId, resource, params={}) {
   if(!r.ok) throw new Error(`PrestaShop HTTP ${r.status} for ${resource}`);
   if(!t.trim()) throw new Error(`PrestaShop returned an empty response for ${resource}`);
   let data;
-  try{data=JSON.parse(t)}catch{throw new Error(`PrestaShop returned non-JSON data for ${resource} (HTTP ${r.status}; content-type ${r.headers.get("content-type")||"unknown"})`)}
+  try{data=JSON.parse(t)}catch{
+    const protection=/\.well-known\/captcha|sgcaptcha|sg-captcha|sgverify|siteground/i.test(t)?"SiteGround challenge":/cf-chl-|cloudflare/i.test(t)?"Cloudflare challenge":/captcha|challenge|verify.{0,30}browser|checking.{0,30}browser/i.test(t)?"browser challenge":"unidentified non-JSON response";
+    throw new Error(`PrestaShop returned ${protection} for ${resource} (HTTP ${r.status}; content-type ${r.headers.get("content-type")||"unknown"})`);
+  }
   if(data.errors) throw new Error(`PrestaShop returned API errors for ${resource}`);
   if(!data[resource]) throw new Error(`PrestaShop response is missing ${resource}`);
   return data;
