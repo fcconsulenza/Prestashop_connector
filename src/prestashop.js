@@ -52,7 +52,7 @@ export async function lowStock({storeId,maxQuantity=5,limit=50}){
 }
 
 export async function recentOrders({storeId,limit=25}){
-  const d=await psGet(storeId,"orders",{display:"[id,reference,total_paid_tax_incl,current_state,date_add,date_upd,valid]",sort:"[date_add_DESC]",limit:`0,${Math.min(limit,cfg.maxPage)}`});
+  const d=await psGet(storeId,"orders",{display:"[id,reference,total_paid_tax_incl,current_state,date_add,date_upd,valid]",date:"1",sort:"[date_add_DESC]",limit:`0,${Math.min(limit,cfg.maxPage)}`});
   return arr(d,"orders").map(x=>({id:Number(val(x.id)),reference:val(x.reference)||"",total_paid_tax_incl:Number(val(x.total_paid_tax_incl)||0),state_id:Number(val(x.current_state)||0),valid:String(val(x.valid))==="1",created_at:val(x.date_add)||null,updated_at:val(x.date_upd)||null}));
 }
 
@@ -63,7 +63,7 @@ export async function sales({storeId,from,to}){
   let offset=0, scanned=0, matched=[];
   const size=Math.min(cfg.maxPage,100);
   while(scanned<cfg.maxOrders){
-    const d=await psGet(storeId,"orders",{display:"[id,reference,total_paid_tax_incl,current_state,date_add,valid]",sort:"[date_add_DESC]",limit:`${offset},${size}`});
+    const d=await psGet(storeId,"orders",{display:"[id,reference,total_paid_tax_incl,current_state,date_add,valid]",date:"1",sort:"[date_add_DESC]",limit:`${offset},${size}`});
     const batch=arr(d,"orders"); if(!batch.length) break;
     for(const x of batch){
       scanned++;
