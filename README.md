@@ -60,7 +60,7 @@ Preserve the key's identity; extend only this dedicated connector key. No PUT or
 - `prestashop_preview_order_state`: an order-state transition via `order_histories`, without requesting customer email. State hooks can still affect stock, invoices and third-party integrations.
 - `prestashop_apply_preview`: signed preview token plus `confirm:true`, only after the user explicitly approves the exact before/after values and effects. Tokens expire after ten minutes; the record is re-read before writing and verified afterwards. Tokens are consumed before the write attempt. Uncertain outcomes must be inspected, never automatically retried.
 
-The bearer token signs previews and never appears in preview contents. Replay protection is in memory, suitable for this single-instance service; changing the bearer invalidates outstanding previews. A restart resets the replay cache. The upstream Webservice has no atomic compare-and-swap: a small race between the pre-write read and the write remains. Do not use this design with multiple replicas without shared durable replay protection and concurrency coordination.
+The bearer token signs previews and never appears in preview contents. In-memory replay protection is supplemented by a per-process signing epoch: outstanding previews become invalid after a restart. SiteGround SSH writes also consume their nonces atomically in a persistent private directory on the store server. Changing the bearer invalidates outstanding previews. The upstream Webservice has no atomic compare-and-swap: a small race between the pre-write read and the write remains. Do not use this design with multiple replicas without shared durable replay protection and concurrency coordination.
 
 Tests use a simulated upstream and a real local MCP transport. Live write verification requires an owner-selected test record and explicit approval; configuring write support does not authorize changing a real product or order.
 
@@ -73,3 +73,12 @@ Create a dedicated Webservice key named FC AI READ and grant GET only to:
 - orders
 
 Keep API keys exclusively in server environment variables.
+
+
+## SiteGround cloud SSH (0.5.0)
+
+`FC_CLOUD_SSH_CONNECTIONS` maps store IDs to host, port, user, SHA256 host-key hash and secret variable name. Each `FC_SSH_KEY_<STORE>` contains a dedicated OpenSSH private key, configured in Render secrets only. `src/cloud-ssh.js` routes only the configured stores through SSH; other stores keep HTTPS.
+
+The matching public keys authorize only the forced `fc-prestashop-bridge` command, with no PTY, agent, X11 or port forwarding. The PHP runner, account configuration and consumed nonce files are outside public_html with owner-only permissions. Order reads reject customer fields. PUT, DELETE and authentication/method overrides are refused. Host identity is pinned; errors never trigger an automatic fallback or retry of a write.
+
+The bridge uses the native PrestaShop Webservice with the dedicated key. SSH connectivity and previews are verified independently of actual business writes. Installing the bridge does not authorize a product or order mutation. See the SSH2 [client documentation](https://github.com/mscdex/ssh2) for the transport API.
