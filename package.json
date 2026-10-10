@@ -1,9 +1,10 @@
 {
   "name":"fc-ai-prestashop-connector",
-  "version":"0.4.0",
+  "version":"0.5.0",
   "private":true,
   "type":"module",
   "scripts":{"start":"node src/server.js"},
   "engines":{"node":">=20"},
-  "dependencies":{"@modelcontextprotocol/sdk":"^1.20.0","express":"^5.1.0","zod":"^3.25.0"}
+  "dependencies":{"@modelcontextprotocol/sdk":"^1.20.0","express":"^5.1.0","zod":"^3.25.0","ssh2":"1.17.0"}
 }
+
