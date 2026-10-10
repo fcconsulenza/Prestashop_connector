@@ -17,6 +17,9 @@ const scalar = v => typeof v === 'object' && v !== null ? v['#text'] ?? v.value 
 const escape = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 const used = new Map();
 const pending = new Set();
+// Outstanding tokens cannot survive process restarts. SSH additionally consumes
+// nonces atomically in a private persistent directory on each store's server.
+const previewEpoch=crypto.randomUUID();
 const discountFields=['id_product','id_shop','id_shop_group','id_currency','id_country','id_group','id_customer','id_product_attribute','id_cart','price','from_quantity','reduction','reduction_tax','reduction_type','from','to'];
 const dateTime=z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/).refine(v=>Number.isFinite(Date.parse(v.replace(' ','T'))),'Invalid date');
 export const discountInput={storeId:z.string().min(1),productId:id,shopId:id,specificPriceId:id.optional(),
@@ -32,7 +35,7 @@ function requireWrite(storeId) {
 }
 function signingKey() {
   if (!cfg.bearer) throw new Error('MCP authentication is not configured');
-  return cfg.bearer;
+  return cfg.bearer+':'+previewEpoch;
 }
 function sign(plan) {
   const payload = Buffer.from(JSON.stringify(plan)).toString('base64url');
@@ -149,7 +152,8 @@ async function send(plan) {
   try {
     r=await fetch(url,{method:create?'POST':'PATCH',redirect:'manual',signal:AbortSignal.timeout(15000),headers:{
       Authorization:`Basic ${Buffer.from(`${s.apiKey}:`).toString('base64')}`,
-      'Content-Type':'application/xml',Accept:'application/json','Output-Format':'JSON','User-Agent':'FC-AI-Connector/0.4.0'},
+      'Content-Type':'application/xml',Accept:'application/json','Output-Format':'JSON','User-Agent':'FC-AI-Connector/0.5.0',
+      ...(process.env.FC_CLOUD_SSH_CONNECTIONS?{'X-FC-Preview-Nonce':plan.nonce,'X-FC-Preview-Expires':String(plan.expiresAt)}:{})},
       body:`<?xml version="1.0" encoding="UTF-8"?><prestashop><${node}>${fields}</${node}></prestashop>`});
   } catch { throw new Error('Write outcome is uncertain; inspect the record before making a new attempt'); }
   const body=await r.text().catch(()=>null);
@@ -187,8 +191,9 @@ export async function applyPreview({previewToken,confirm}) {
     let actual;
     try {actual=await readBefore(plan);} catch {throw new Error('Write submitted but verification failed; inspect the record before retrying');}
     const verified=JSON.stringify(actual)===JSON.stringify(plan.changes);
-    console.log(JSON.stringify({event:'prestashop_write',storeId:plan.storeId,resource:plan.resource,id:plan.id,verified}));
+    console.error(JSON.stringify({event:'prestashop_write',storeId:plan.storeId,resource:plan.resource,id:plan.id,verified}));
     return {ok:verified,verified,store_id:plan.storeId,resource:plan.resource,record_id:plan.id,actual,
       ...(verified?{}:{warning:'Saved values differ from the preview; inspect before retrying'})};
   } finally {pending.delete(plan.nonce);}
 }
+
