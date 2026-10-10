@@ -10,7 +10,11 @@ export const stores = [
   { id: "golamifa", name: "Golamifa", baseUrl: "https://www.golamifa.it", keyEnv: "PS_KEY_GOLAMIFA", fee: null },
   { id: "presepiale", name: "Presepiale", baseUrl: "https://presepiale.it", keyEnv: "PS_KEY_PRESEPIALE", fee: null },
   { id: "frameinterni", name: "Frame Interni", baseUrl: "https://frameinterni.com", keyEnv: "PS_KEY_FRAMEINTERNI", fee: null },
-  { id: "provenzalemotorstore", name: "Provenzale Motor Store", baseUrl: "https://provenzalemotorstore.it", keyEnv: "PS_KEY_PROVENZALEMOTORSTORE", fee: null }
+  { id: "provenzalemotorstore", name: "Provenzale Motor Store", baseUrl: "https://provenzalemotorstore.it", keyEnv: "PS_KEY_PROVENZALEMOTORSTORE", fee: null },
+  { id: "quiscuola", name: "Quiscuola", baseUrl: "https://quiscuola.com", keyEnv: "PS_KEY_QUISCUOLA", fee: null },
+  { id: "santobevitore", name: "Santo Bevitore", baseUrl: "https://santobevitore.it", keyEnv: "PS_KEY_SANTOBEVITORE", fee: null },
+  { id: "hollystore", name: "Hollystore", baseUrl: "https://hollystore.it", keyEnv: "PS_KEY_HOLLYSTORE", fee: null },
+  { id: "ostecustode", name: "Oste Custode", baseUrl: "https://ostecustode.it", keyEnv: "PS_KEY_OSTECUSTODE", fee: null }
 ];
 
 export const cfg = {
