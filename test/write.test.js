@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import { previewProduct, previewStock, previewOrderState, previewDiscount, applyPreview } from '../src/write.js';
 import { cfg } from '../src/config.js';
 
+test('outstanding preview is invalidated when its signing process is restarted',async()=>{
+ const original=global.fetch,bearer=cfg.bearer;
+ cfg.bearer='restart-test';process.env.PS_KEY_LACARTOLERIA='fake';process.env.PS_WRITE_STORES='lacartoleria';
+ try{
+  global.fetch=async()=>Response.json({products:[{id:'1',price:'10'}]});
+  const first=await import('../src/write.js?process=first');
+  const preview=await first.previewProduct({storeId:'lacartoleria',productId:1,changes:{price:9}});
+  const restarted=await import('../src/write.js?process=restarted');
+  await assert.rejects(restarted.applyPreview({previewToken:preview.preview_token,confirm:true}),/Invalid preview/);
+ }finally{global.fetch=original;cfg.bearer=bearer;delete process.env.PS_KEY_LACARTOLERIA;delete process.env.PS_WRITE_STORES;}
+});
+
 test('writes require enabled store, signed approval, fresh values; exact PATCH is verified and cannot replay', async()=>{
   const original=global.fetch;
   const bearer=cfg.bearer;
@@ -77,3 +89,4 @@ test('discount creation is shop-scoped, converts percentages, verifies created r
     await assert.rejects(previewDiscount({...args,reductionType:'amount'}),/currencyId/);
   } finally {global.fetch=original;cfg.bearer=bearer;delete process.env.PS_KEY_LACARTOLERIA;delete process.env.PS_WRITE_STORES;}
 });
+
