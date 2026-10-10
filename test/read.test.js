@@ -14,6 +14,7 @@ test('canonical API, JSON headers, safe errors and order PII allowlist', async (
       assert.equal(url.hostname,'adipietro.it');
       assert.equal(options.redirect,'manual');
       assert.equal(options.headers['Output-Format'],'JSON');
+      assert.equal(url.searchParams.get('date'),'1');
       return new Response(JSON.stringify({orders:[{id:'1',reference:'ABC',total_paid_tax_incl:'100',id_customer:'SECRET',email:'SECRET',current_state:'2',valid:'1'}]}));
     };
     const orders=await recentOrders({storeId:'adipietro',limit:5});
