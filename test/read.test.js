@@ -25,6 +25,9 @@ test('canonical API, JSON headers, safe errors and order PII allowlist', async (
     await assert.rejects(testStore('adipietro'),/redirects the API/);
     global.fetch=async()=>new Response(JSON.stringify({products:[{id:3,price:'12.34',reference:'SKU',active:'1'}]}));
     assert.equal((await products({storeId:'adipietro',limit:5}))[0].price_tax_excl,12.34);
+    global.fetch=async()=>new Response('[]');
+    assert.deepEqual(await products({storeId:'adipietro',limit:5}),[]);
+    assert.deepEqual(await testStore('adipietro'),{ok:true,store_id:'adipietro'});
   } finally {global.fetch=original;delete process.env.PS_KEY_ADIPIETRO;}
 });
 
