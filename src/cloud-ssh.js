@@ -1,6 +1,17 @@
 import crypto from 'node:crypto';
 import {Client} from 'ssh2';
 import {stores} from './config.js';
+let active=0;
+const waiting=[];
+function release(){active--;const next=waiting.shift();if(next){clearTimeout(next.timer);active++;next.resolve(release);}}
+async function acquire(){
+ if(active<4){active++;return release;}
+ if(waiting.length>=32)throw new Error('Cloud SSH capacity exceeded');
+ return new Promise((resolve,reject)=>{
+  const entry={resolve,reject};entry.timer=setTimeout(()=>{const index=waiting.indexOf(entry);if(index>=0)waiting.splice(index,1);reject(new Error('Cloud SSH queue timed out'));},15000);
+  waiting.push(entry);
+ });
+}
 
 export function buildRequest(url,options={}) {
  const route=url.pathname.match(/^\/api\/([a-z_]+)(?:\/(\d+))?$/);
@@ -23,9 +34,10 @@ export async function sshRequest(connection,request){
  const privateKey=process.env[connection.keyEnv];
  if(!privateKey)throw new Error('Cloud SSH key is missing');
  if(!/^[a-f0-9]{64}$/.test(connection.hostHash))throw new Error('Cloud SSH host identity is missing');
+ const releaseSlot=await acquire();
  return new Promise((resolve,reject)=>{
   const client=new Client();let settled=false;
-  const finish=(err,result)=>{if(settled)return;settled=true;clearTimeout(timer);client.end();err?reject(err):resolve(result);};
+  const finish=(err,result)=>{if(settled)return;settled=true;clearTimeout(timer);releaseSlot();client.end();err?reject(err):resolve(result);};
   const timer=setTimeout(()=>finish(new Error('Cloud SSH request timed out; do not automatically retry writes')),45000);
   client.on('error',()=>finish(new Error('Cloud SSH connection failed')));
   client.on('ready',()=>client.exec('fc-prestashop-bridge',(err,stream)=>{
@@ -38,9 +50,9 @@ export async function sshRequest(connection,request){
    });
    stream.end(JSON.stringify(request));
   }));
-  client.connect({host:connection.host,port:connection.port||18765,username:connection.user,privateKey,readyTimeout:15000,algorithms:{serverHostKey:['ssh-ed25519']},hostHash:'sha256',hostVerifier:hash=>{
+  try{client.connect({host:connection.host,port:connection.port||18765,username:connection.user,privateKey,readyTimeout:15000,algorithms:{serverHostKey:['ssh-ed25519']},hostHash:'sha256',hostVerifier:hash=>{
    const a=Buffer.from(hash),b=Buffer.from(connection.hostHash);return a.length===b.length&&crypto.timingSafeEqual(a,b);
-  }});
+  }});}catch{finish(new Error('Cloud SSH connection could not start'));}
  });
 }
 export function installCloudSsh(){
