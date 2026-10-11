@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { cfg } from "./config.js";
 import { installCloudSsh } from './cloud-ssh.js';
-import { listStores,testStore,products,lowStock,recentOrders,sales } from "./prestashop.js";
+import { listStores,testStore,products,lowStock,recentOrders,sales,orderContent } from "./prestashop.js";
 import { productChanges, previewProduct, previewStock, previewOrderState, orderStates, applyPreview, discountInput, previewDiscount, listDiscounts } from './write.js';
 
 const app=express();
@@ -34,6 +34,7 @@ function makeServer(){
   const identity={storeId:z.string().min(1)};
   const recordId=z.number().int().positive().max(2147483647);
   const register=(name,description,inputSchema,fn)=>m.registerTool(name,{description,inputSchema,annotations:{readOnlyHint:name!=='prestashop_apply_preview',destructiveHint:name==='prestashop_apply_preview',idempotentHint:name!=='prestashop_apply_preview',openWorldHint:true}},async a=>{try{return out(await fn(a))}catch(e){return fail(e)}});
+  register('prestashop_order_content','Read the products, quantities and prices in one order; no customer personal fields.',{...identity,orderId:recordId},orderContent);
   register('prestashop_order_states','Read available order state IDs, labels and workflow flags.',identity,orderStates);
   register('prestashop_list_discounts','Read discount IDs, shop, combination, quantity threshold, reduction and dates for one product.',{...identity,productId:recordId},listDiscounts);
   register('prestashop_preview_product_update','Preview updates to an existing product. Price is tax-exclusive. Localized content requires languageId. Does not write.',{...identity,productId:recordId,languageId:recordId.optional(),changes:productChanges},previewProduct);

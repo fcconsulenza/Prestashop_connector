@@ -7,6 +7,25 @@ const val = v => {
 };
 const arr = (o,k) => !o?.[k] ? [] : Array.isArray(o[k]) ? o[k] : [o[k]];
 
+export function localizedName(value){
+  if(typeof val(value)==='string')return val(value);
+  const list=Array.isArray(value)?value:Array.isArray(value?.language)?value.language:[value?.language||value];
+  const available=list.filter(Boolean).map(item=>({id:Number(item.id||item['@id']||item['@attributes']?.id||0),text:String(val(item.value??item)||'')}));
+  return (available.find(item=>item.id===1&&item.text)||available.find(item=>item.text))?.text||'';
+}
+
+export async function orderContent({storeId,orderId}){
+  if(!Number.isSafeInteger(orderId)||orderId<1)throw new Error('Invalid order identity');
+  const data=await psGet(storeId,'orders',{'filter[id]':`[${orderId}]`,display:'full',limit:'0,1',fc_order_items:'1'});
+  const order=arr(data,'orders').find(row=>Number(val(row.id))===orderId);
+  if(!order)throw new Error('Order not found');
+  const raw=order.associations?.order_rows;
+  if(raw===undefined)throw new Error('Order rows were not returned');
+  const rows=Array.isArray(raw)?raw:raw?.order_row?arr(raw,'order_row'):[];
+  const number=value=>{const v=val(value);return v==null||v===''?null:Number.isFinite(Number(v))?Number(v):null;};
+  return {store_id:storeId,order_id:orderId,reference:String(val(order.reference)||''),total_paid_tax_incl:number(order.total_paid_tax_incl),items:rows.map(row=>({product_id:number(row.product_id),combination_id:number(row.product_attribute_id),name:String(val(row.product_name)||''),reference:String(val(row.product_reference)||''),ean13:String(val(row.product_ean13)||''),quantity:number(row.product_quantity),unit_price_tax_incl:number(row.unit_price_tax_incl),unit_price_tax_excl:number(row.unit_price_tax_excl)}))};
+}
+
 export async function psGet(storeId, resource, params={}) {
   const s=getStore(storeId);
   const url=new URL(`${s.baseUrl}/api/${resource}`);
@@ -40,10 +59,10 @@ export async function testStore(storeId){
 }
 
 export async function products({storeId,search,limit=25}){
-  const p={display:"[id,reference,ean13,price,active,date_upd]",sort:"[id_DESC]",limit:`0,${Math.min(limit,cfg.maxPage)}`};
+  const p={display:"[id,name,reference,ean13,price,active,date_upd]",sort:"[id_DESC]",limit:`0,${Math.min(limit,cfg.maxPage)}`};
   if(search) p["filter[name]"]=`%[${String(search).slice(0,60)}]%`;
   const d=await psGet(storeId,"products",p);
-  return arr(d,"products").map(x=>({id:Number(val(x.id)),reference:val(x.reference)||"",ean13:val(x.ean13)||"",price_tax_excl:Number(val(x.price)||0),active:String(val(x.active))==="1",updated_at:val(x.date_upd)||null}));
+  return arr(d,"products").map(x=>({id:Number(val(x.id)),name:localizedName(x.name),reference:val(x.reference)||"",ean13:val(x.ean13)||"",price_tax_excl:Number(val(x.price)||0),active:String(val(x.active))==="1",updated_at:val(x.date_upd)||null}));
 }
 
 export async function lowStock({storeId,maxQuantity=5,limit=50}){
@@ -59,7 +78,7 @@ export async function recentOrders({storeId,limit=25}){
 export async function sales({storeId,from,to}){
   const s=getStore(storeId);
   const start=new Date(`${from}T00:00:00`), end=new Date(`${to}T23:59:59`);
-  if(Number.isNaN(+start)||Number.isNaN(+end)||start>end) throw new Error("Invalid date range");
+  if(Number.isNaN(+start)||Number.isNaN(+end)||start>end||end-start>366*86400000) throw new Error("Invalid date range");
   let offset=0, scanned=0, matched=[];
   const size=Math.min(cfg.maxPage,100);
   while(scanned<cfg.maxOrders){
@@ -68,12 +87,18 @@ export async function sales({storeId,from,to}){
     for(const x of batch){
       scanned++;
       const dt=new Date(String(val(x.date_add)).replace(" ","T"));
-      if(dt>=start&&dt<=end&&String(val(x.valid))==="1") matched.push({id:Number(val(x.id)),total:Number(val(x.total_paid_tax_incl)||0)});
+      if(dt>=start&&dt<=end&&String(val(x.valid))==="1") matched.push({id:Number(val(x.id)),date:String(val(x.date_add)).slice(0,10),total:Number(val(x.total_paid_tax_incl)||0)});
     }
     const oldest=new Date(String(val(batch.at(-1)?.date_add)).replace(" ","T"));
     if(oldest<start||batch.length<size) break;
     offset+=size;
   }
+  const daily=[];
+  for(let day=new Date(`${from}T12:00:00Z`);day.toISOString().slice(0,10)<=to;day.setUTCDate(day.getUTCDate()+1)){
+    const date=day.toISOString().slice(0,10),rows=matched.filter(row=>row.date===date);
+    daily.push({date,orders:rows.length,revenue_tax_incl:+rows.reduce((sum,row)=>sum+row.total,0).toFixed(2)});
+  }
   const revenue=matched.reduce((a,x)=>a+x.total,0);
-  return {store_id:s.id,store_name:s.name,from,to,orders:matched.length,revenue_tax_incl:+revenue.toFixed(2),average_order_value:+(matched.length?revenue/matched.length:0).toFixed(2),management_fee_percent:s.fee,management_fee_amount:s.fee==null?null:+(revenue*s.fee/100).toFixed(2),scan_limit_reached:scanned>=cfg.maxOrders};
+  return {store_id:s.id,store_name:s.name,from,to,daily,orders:matched.length,revenue_tax_incl:+revenue.toFixed(2),average_order_value:+(matched.length?revenue/matched.length:0).toFixed(2),management_fee_percent:s.fee,management_fee_amount:s.fee==null?null:+(revenue*s.fee/100).toFixed(2),scan_limit_reached:scanned>=cfg.maxOrders};
 }
+
