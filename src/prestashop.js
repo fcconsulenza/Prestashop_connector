@@ -1,4 +1,5 @@
 import { cfg, getStore, stores } from "./config.js";
+import { normalizeBarcode } from './barcode.mjs';
 
 const val = v => {
   if (v == null) return v;
@@ -58,11 +59,21 @@ export async function testStore(storeId){
   return {ok:true,store_id:storeId};
 }
 
+export async function findBarcode({storeId,barcode}){
+  const code=normalizeBarcode(barcode);
+  const alternatives=code.length===13&&code.startsWith('0')?[code,code.slice(1)]:[code];
+  const data=await psGet(storeId,'products',{display:'[id,name,reference,ean13,price,active,date_upd]','filter[ean13]':`[${alternatives.join('|')}]`,sort:'[id_ASC]',limit:'0,21'});
+  const rows=arr(data,'products');
+  // Do not accept fuzzy matches, even if an upstream store ignores its filter.
+  if(rows.some(row=>!alternatives.includes(String(val(row.ean13)||''))))throw new Error('Barcode filter was not respected by the store');
+  return {barcode:code,items:rows.slice(0,20).map(normalizeProduct),limited:rows.length>20,scope:'base_products'};
+}
+const normalizeProduct=x=>({id:Number(val(x.id)),name:localizedName(x.name),reference:val(x.reference)||'',ean13:String(val(x.ean13)||''),price_tax_excl:Number(val(x.price)||0),active:String(val(x.active))==='1',updated_at:val(x.date_upd)||null});
 export async function products({storeId,search,limit=25}){
   const p={display:"[id,name,reference,ean13,price,active,date_upd]",sort:"[id_DESC]",limit:`0,${Math.min(limit,cfg.maxPage)}`};
   if(search) p["filter[name]"]=`%[${String(search).slice(0,60)}]%`;
   const d=await psGet(storeId,"products",p);
-  return arr(d,"products").map(x=>({id:Number(val(x.id)),name:localizedName(x.name),reference:val(x.reference)||"",ean13:val(x.ean13)||"",price_tax_excl:Number(val(x.price)||0),active:String(val(x.active))==="1",updated_at:val(x.date_upd)||null}));
+  return arr(d,"products").map(normalizeProduct);
 }
 
 export async function lowStock({storeId,maxQuantity=5,limit=50}){
@@ -101,4 +112,3 @@ export async function sales({storeId,from,to}){
   const revenue=matched.reduce((a,x)=>a+x.total,0);
   return {store_id:s.id,store_name:s.name,from,to,daily,orders:matched.length,revenue_tax_incl:+revenue.toFixed(2),average_order_value:+(matched.length?revenue/matched.length:0).toFixed(2),management_fee_percent:s.fee,management_fee_amount:s.fee==null?null:+(revenue*s.fee/100).toFixed(2),scan_limit_reached:scanned>=cfg.maxOrders};
 }
-

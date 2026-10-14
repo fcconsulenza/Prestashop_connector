@@ -32,7 +32,7 @@ test('canonical API, JSON headers, safe errors and order PII allowlist', async (
   } finally {global.fetch=original;delete process.env.PS_KEY_ADIPIETRO;}
 });
 
-test('real MCP transport: auth, handshake, fourteen tools, object structuredContent', async () => {
+test('real MCP transport: auth, handshake, fifteen tools, object structuredContent', async () => {
   const child=spawn(process.execPath,['src/server.js'],{env:{...process.env,PORT:'31983',MCP_BEARER_TOKEN:'local-test-only'}});
   const exited=once(child,'exit');
   try {
@@ -42,7 +42,7 @@ test('real MCP transport: auth, handshake, fourteen tools, object structuredCont
     const client=new Client({name:'verification',version:'1'});
     await client.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:31983/mcp'),{requestInit:{headers:{Authorization:'Bearer local-test-only'}}}));
     const tools=(await client.listTools()).tools;
-    assert.equal(tools.length,14);
+    assert.equal(tools.length,15);
     assert.equal(tools.find(t=>t.name==='prestashop_apply_preview').annotations.readOnlyHint,false);
     const result=await client.callTool({name:'prestashop_list_stores',arguments:{}});
     assert.ok(Array.isArray(result.structuredContent.items));
@@ -63,4 +63,3 @@ test('localized names, textual EAN, filtered order lines and daily sums includin
   assert.deepEqual(result.daily,[{date:'2026-10-05',orders:2,revenue_tax_incl:12},{date:'2026-10-06',orders:0,revenue_tax_incl:0}]);assert.equal(result.revenue_tax_incl,12);
  }finally{global.fetch=original;delete process.env.PS_KEY_ADIPIETRO;}
 });
-
