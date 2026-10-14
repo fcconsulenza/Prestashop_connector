@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { cfg } from "./config.js";
 import { installCloudSsh } from './cloud-ssh.js';
-import { listStores,testStore,products,lowStock,recentOrders,sales,orderContent } from "./prestashop.js";
+import { listStores,testStore,products,lowStock,recentOrders,sales,orderContent,findBarcode } from "./prestashop.js";
 import { productChanges, previewProduct, previewStock, previewOrderState, orderStates, applyPreview, discountInput, previewDiscount, listDiscounts } from './write.js';
 
 const app=express();
@@ -32,6 +32,7 @@ function makeServer(){
   m.registerTool("prestashop_recent_orders",{title:"Recent orders",description:"Read order references, totals, states and dates. No customer PII.",inputSchema:{storeId:z.string().min(1),limit:z.number().int().min(1).max(100).default(25)}},async a=>{try{return out(await recentOrders(a))}catch(e){return fail(e)}});
   m.registerTool("prestashop_sales_summary",{title:"Sales summary",description:"Calculate valid-order gross revenue, AOV and FC management fee for a date range.",inputSchema:{storeId:z.string().min(1),from:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),to:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}},async a=>{try{return out(await sales(a))}catch(e){return fail(e)}});
   const identity={storeId:z.string().min(1)};
+  m.registerTool('prestashop_find_barcode',{description:'Find exact EAN/UPC in base products only. Excludes combination-specific codes. Read-only.',inputSchema:{...identity,barcode:z.string().regex(/^(?:\d{8}|\d{12}|\d{13})$/)},annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true}},async a=>{try{return out(await findBarcode(a))}catch(e){return fail(e)}});
   const recordId=z.number().int().positive().max(2147483647);
   const register=(name,description,inputSchema,fn)=>m.registerTool(name,{description,inputSchema,annotations:{readOnlyHint:name!=='prestashop_apply_preview',destructiveHint:name==='prestashop_apply_preview',idempotentHint:name!=='prestashop_apply_preview',openWorldHint:true}},async a=>{try{return out(await fn(a))}catch(e){return fail(e)}});
   register('prestashop_order_content','Read the products, quantities and prices in one order; no customer personal fields.',{...identity,orderId:recordId},orderContent);
@@ -56,4 +57,3 @@ app.post("/mcp",auth,async(req,res)=>{
 });
 app.all("/mcp",auth,(_q,r)=>r.status(405).json({error:"Use POST for this stateless MCP endpoint"}));
 app.listen(cfg.port,"0.0.0.0",()=>console.log(`FC AI Connector listening on ${cfg.port}`));
-
